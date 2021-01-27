@@ -75,18 +75,18 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\..\..\Parchis\Parchis.cs">
+    <Compile Include="Ficha.cs" />
+    <Compile Include="Parchis.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="..\..\..\Parchis\Parchis.Designer.cs">
+    <Compile Include="Parchis.designer.cs">
       <DependentUpon>Parchis.cs</DependentUpon>
     </Compile>
-    <Compile Include="..\..\..\..\Users\Enric\Desktop\Ficha.cs">
-      <Link>Ficha.cs</Link>
+    <Compile Include="Program.cs">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Compile>
-    <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <EmbeddedResource Include="..\..\..\Parchis\Parchis.resx">
+    <EmbeddedResource Include="Parchis.resx">
       <DependentUpon>Parchis.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Properties\Resources.resx">

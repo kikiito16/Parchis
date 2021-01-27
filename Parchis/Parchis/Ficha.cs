@@ -184,7 +184,7 @@ namespace Cliente
             this.nombre = nombre;
         }
 
-        public void Sacarcasa()
+        public void Sacarcasa(string color)
         {
             // Aqui sacamos cada ficha en la posición de salida del tablero segun su respectivo color
 

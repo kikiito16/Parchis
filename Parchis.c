@@ -27,6 +27,10 @@ ListaConectados miLista;
 //Creamos una lista de sockets
 int sockets[100];
 int i;
+char invitador [50];
+char invitado[50];
+int socket_invitado;
+int socket_invitador;
 //----------------------------------------------------------------------------//
 
 //Vamos a definir el método DameGanador para la implementación: 1
@@ -51,7 +55,7 @@ void DameGanador (char id[30], char respuesta[60])
 	}
 	
 	//inicializamos la conexion
-	conn = mysql_real_connect (conn, "localhost","root", "mysql", "T10_BD",0, NULL, 0);
+	conn = mysql_real_connect (conn, "shiva2.upc.es","root", "mysql", "T10_BD",0, NULL, 0);
 	if (conn==NULL) {
 		printf ("Error al inicializar la conexion: %u %s\n",
 				mysql_errno(conn), mysql_error(conn));
@@ -106,7 +110,7 @@ void DameContra(char contra[30], char respuesta[512])
 	}
 	
 	//inicializamos la conexion
-	conn = mysql_real_connect (conn, "localhost","root", "mysql", "T10_BD",0, NULL, 0);
+	conn = mysql_real_connect (conn, "shiva2.upc.es","root", "mysql", "T10_BD",0, NULL, 0);
 	if (conn==NULL) {
 		printf ("Error al inicializar la conexion: %u %s\n",
 				mysql_errno(conn), mysql_error(conn));
@@ -162,7 +166,7 @@ void DimeJugadores (char id[30], char respuesta[60])
 	}
 	
 	//inicializamos la conexion
-	conn = mysql_real_connect (conn, "localhost","root", "mysql", "T10_BD",0, NULL, 0);
+	conn = mysql_real_connect (conn, "shiva2.upc.es","root", "mysql", "T10_BD",0, NULL, 0);
 	if (conn==NULL) {
 		printf ("Error al inicializar la conexion: %u %s\n",
 				mysql_errno(conn), mysql_error(conn));
@@ -229,7 +233,7 @@ void LogIn(ListaConectados *l,char us[60], char psw[60], int socket_login, char 
 	}
 	
 	//inicializamos la conexion
-	conn = mysql_real_connect (conn, "localhost","root", "mysql", "T10_BD",0, NULL, 0);
+	conn = mysql_real_connect (conn, "shiva2.upc.es","root", "mysql", "T10_BD",0, NULL, 0);
 	if (conn==NULL) {
 		printf ("Error al inicializar la conexion: %u %s\n",
 				mysql_errno(conn), mysql_error(conn));
@@ -252,7 +256,7 @@ void LogIn(ListaConectados *l,char us[60], char psw[60], int socket_login, char 
 	row = mysql_fetch_row (resultado);
 	
 	if (row == NULL)
-		sprintf (respuesta,"4/Alguno de los datos es incorrecto \n");
+		sprintf (respuesta,"4/0\n"); //Manda un 0 si no encuentra ningun usuario
 	
 	else
 	{
@@ -265,12 +269,215 @@ void LogIn(ListaConectados *l,char us[60], char psw[60], int socket_login, char 
 			i++;
 			pthread_mutex_unlock( &mutex);
 		}
+		else{
+			sprintf(respuesta, "4/0");
+		}
 	}
 	printf ("%s\n",respuesta);
 }
-//----------------------------------------------------------------------------//
 
-//Vamos a definir los siguientes métodos para la implementación: 5
+void Registro(ListaConectados *l,char us[60], char psw[60], int socket_registro, char respuesta[512])
+{
+	//Construimos la consulta SQL
+	MYSQL *conn;    //Preparamos las variables para usar la base de datos
+	int err;
+	MYSQL_RES *resultado;
+	MYSQL_ROW row;
+	char consulta [500];
+	
+	
+	//Creamos una conexion al servidor MYSQL
+	conn = mysql_init(NULL);
+	if (conn==NULL) {
+		printf ("Error al crear la conexion: %u %s\n",
+				mysql_errno(conn), mysql_error(conn));
+		exit (1);
+	}
+	
+	//inicializamos la conexion
+	conn = mysql_real_connect (conn, "shiva2.upc.es","root", "mysql", "T10_BD",0, NULL, 0);
+	if (conn==NULL) {
+		printf ("Error al inicializar la conexion: %u %s\n",
+				mysql_errno(conn), mysql_error(conn));
+		exit (1);
+	}
+	
+	err=mysql_query(conn,"SELECT Us from Jugador");
+	if (err!=0)
+	{
+		printf("Error al consultar datos de la base %u %s\n",
+			   mysql_errno(conn),mysql_error(conn));
+		exit(1);
+	}
+	
+	resultado=mysql_store_result(conn);
+	//Estructura matricial en memoria
+	//cada fila contiene los datos de una partida
+	//obtenemos los datos de una fila
+	row=mysql_fetch_row(resultado);
+	int encontrado=0;
+	if (row==NULL){
+		printf("No se han obtenido datos en la consulta\n");
+		sprintf(respuesta,"9/1");
+	}
+	
+	else
+	{
+		while ((row !=NULL)&&(encontrado==0))
+		{
+			//miramos si ya existe un jugador en la base de datos con el mismo nombre y contraseÃ±a
+			if((strcmp(us,row[0])==0))
+				//el jugador ya existe
+				//envia un 0 al cliente para informar de que este jugador ya existe
+			{
+				sprintf(respuesta,"9/0");
+				printf("%s \n",respuesta);
+				encontrado=1;
+			}
+			row=mysql_fetch_row(resultado); //recorre toda la tabla
+		}
+		
+		if (encontrado==0) 
+			//Debido a que no ha encontrado ningun jugador así, lo añado a la base de datos
+		{
+			//creamos la consulta
+			strcpy (consulta, "INSERT INTO Jugador VALUES ('");
+			//añadimos el usuario
+			strcat (consulta, us); 
+			strcat (consulta, "','");
+			//añadimos la contraseña
+			strcat (consulta, psw); 
+			strcat (consulta, "');");
+			
+			// Añadimos el usuario a la lista de conectados
+			PonUsuario(l,us,socket_registro);
+			
+			
+			err = mysql_query(conn, consulta);
+			if (err!=0) 
+				printf ("Error al introducir datos la base %u %s\n", mysql_errno(conn), mysql_error(conn));
+			else
+				//se han añadido los valores con exito
+				//informamos al cliente 
+				sprintf(respuesta,"9/%s",us);
+			
+			
+		}
+	}
+}
+
+//Vamos a eliminar a un usuario de la base de datos
+void Eliminar_datos(ListaConectados *l,char us[60], char psw[60], int socket_eliminado, char respuesta[512])
+{
+	//Construimos la consulta SQL
+	MYSQL *conn;    //Preparamos las variables para usar la base de datos
+	int err;
+	MYSQL_RES *resultado;
+	MYSQL_ROW row;
+	char consulta [500];
+	
+	
+	//Creamos una conexion al servidor MYSQL
+	conn = mysql_init(NULL);
+	if (conn==NULL) {
+		printf ("Error al crear la conexion: %u %s\n",
+				mysql_errno(conn), mysql_error(conn));
+		exit (1);
+	}
+	
+	//inicializamos la conexion
+	conn = mysql_real_connect (conn, "shiva2.upc.es","root", "mysql", "T10_BD",0, NULL, 0);
+	if (conn==NULL) {
+		printf ("Error al inicializar la conexion: %u %s\n",
+				mysql_errno(conn), mysql_error(conn));
+		exit (1);
+	}
+	
+	err=mysql_query(conn,"SELECT Us from Jugador");
+	if (err!=0)
+	{
+		printf("Error al consultar datos de la base %u %s\n",
+			   mysql_errno(conn),mysql_error(conn));
+		exit(1);
+	}
+	
+	resultado=mysql_store_result(conn);
+	//Estructura matricial en memoria
+	//cada fila contiene los datos de una partida
+	//obtenemos los datos de una fila
+	row=mysql_fetch_row(resultado);
+	int encontrado=0;
+	if (row==NULL){
+		printf("No se han obtenido datos en la consulta\n");
+		sprintf(respuesta,"15/0");  //error al obtener los datos
+	}
+	
+	else
+	{
+		while ((row !=NULL)&&(encontrado==0))
+		{
+			//miramos si existe un jugador en la base de datos con el mismo nombre
+			if((strcmp(us,row[0])==0))
+				encontrado=1; //el jugador existe, vamos a comprobar si coincide la contraseña
+			
+			row=mysql_fetch_row(resultado); //recorre toda la tabla
+		}
+		
+		if (encontrado==1) 
+			//Debido a que no ha encontrado ningun jugador así, lo añado a la base de datos
+		{
+			//creamos la consulta
+			strcpy(consulta,"SELECT Psw FROM Jugador WHERE Us = '");
+			strcat(consulta, us);
+			strcat(consulta, "'");
+			
+			err=mysql_query (conn, consulta);
+			
+			if (err!=0) {
+				printf ("Error al consultar datos de la base %u %s\n", mysql_errno(conn), mysql_error(conn));
+				exit (1);
+			}
+			
+			//Recogemos el resultado de la consulta
+			resultado = mysql_store_result (conn);
+			row = mysql_fetch_row (resultado);
+			
+			if (row == NULL)
+				sprintf (respuesta,"15/0 \n"); //error al obtener los datos
+			
+			else //En caso de encontrar la contraseña del usuario, compararla con la que nos ha pasado el cliente
+			{
+				if(strcmp(psw,row[0])==0){
+					printf("Usuario: %s, Contraseña: %s\n", us, psw);
+					//sprintf(respuesta, "15/%s",us);
+					strcpy (consulta, "DELETE FROM Jugador WHERE Us ='");
+					strcat (consulta, us); 
+					strcat (consulta, "';");
+					//añadimos la contraseña
+					err = mysql_query(conn, consulta);
+					if (err!=0) 
+						printf ("Error al introducir datos la base %u %s\n", mysql_errno(conn), mysql_error(conn));
+					else
+						//se han añadido los valores con exito
+						//informamos al cliente 
+						sprintf(respuesta,"15/%s",us);
+					
+					printf("%s \n",consulta);
+					
+					
+				}
+				else{
+					sprintf(respuesta, "15/1"); //Manda un 1 si no coincide la contraseña
+				}
+			}
+			printf ("%s\n",respuesta);
+			
+		}
+		
+		if(encontrado==0)
+			sprintf(respuesta,"15/-1"); //Manda un -1 si no encuentra el usuario
+	}
+}
 
 //Devuelve la posicion 0 si está en la lista el usuario o -1 si no esta en la lista el usuario.
 int DamePos (ListaConectados *lista,char nombre[20])
@@ -308,9 +515,10 @@ int DameSocket (ListaConectados *lista, char nombre [20])
 }
 
 
-//retorna 0 si se elimina correctamente o -1 si el usuario no está en la lista
+
+
 int EliminaUsuario (ListaConectados *lista,char nombre[20])
-{	
+{	//retorna 0 si se elimina correctamente o -1 si el usuario no está en la lista
 	int pos= DamePos(lista,nombre);
 	if (pos==-1)
 		return -1;
@@ -440,6 +648,7 @@ void *AtenderCliente (void *socket)
 			
 			if (strcmp(respuesta,us)==0){
 				char conectados [512];
+				pthread_mutex_lock( &mutex);
 				DameConectados(&miLista, conectados);
 				sprintf(notificacion,"5/%s", conectados);			
 				for(int j =0; j<=miLista.num;j++)
@@ -448,6 +657,34 @@ void *AtenderCliente (void *socket)
 					printf("%s\n",notificacion);
 				}
 				strcpy(notificacion,"");
+				pthread_mutex_unlock( &mutex);
+			}
+			//write (sock_conn,respuesta, strlen(respuesta));
+		}
+		
+		else if (codigo==5) //Petición para registrarse
+		{
+			char psw[60];
+			strcpy(us,nombre);
+			p = strtok( NULL, "/");
+			strcpy(psw,p);
+			pthread_mutex_lock( &mutex);
+			Registro(&miLista,us,psw,sock_conn,respuesta);
+			pthread_mutex_unlock( &mutex);
+			
+			if (strcmp(respuesta,us)==0){
+				
+				char conectados [512];
+				pthread_mutex_lock( &mutex);
+				DameConectados(&miLista, conectados);
+				sprintf(notificacion,"5/%s", conectados);			
+				for(int j =0; j<=miLista.num;j++)
+				{
+					write(miLista.conectados[j].socket,notificacion,strlen(notificacion));
+					printf("%s\n",notificacion);
+				}
+				strcpy(notificacion,"");
+				pthread_mutex_unlock( &mutex);
 			}
 			
 		}
@@ -455,53 +692,202 @@ void *AtenderCliente (void *socket)
 		else if (codigo == 6)
 			// cuando el usuario invita a otra persona
 		{
-			char invitado [20];
-			strcpy (invitado, nombre);
-			int socket_invitado;
+			strcpy(invitador,nombre);
+			p = strtok( NULL, "/");
+			strcpy (invitado, p);
+			//int socket_invitado;
+			pthread_mutex_lock( &mutex);
 			socket_invitado = DameSocket(&miLista,invitado);  //obtenemos el socket del invitado
+			pthread_mutex_unlock( &mutex);
 			printf ("Voy a invitar a %d, %s \n", socket_invitado, invitado);
 			strcpy(respuesta,"");
-			sprintf (respuesta,"6/%s",us);
+			sprintf (respuesta,"6/%s/%s",invitador, invitado);
 			write (socket_invitado,respuesta, strlen(respuesta));  //le enviamos la solicitud solo al invitado
 			strcpy(respuesta,"");
+			printf("Este es el socket invitado: %d \n", socket_invitado);
+			printf("Invitador: %s, invitado: %s \n", invitador, invitado);
+			//prueba
+			sprintf(respuesta,"11/%s/%s",invitador,invitado);
+			for (i=0; i<miLista.num; i++)
+			{  //enviamos este mensaje a todos los clientes
+				write (miLista.conectados[i].socket,respuesta, strlen(respuesta)); 
+			}
 			
 		}
 		else if (codigo == 7)
 			// cuando la persona invitada responde
 		{
-			char invitador [20];
 			char decision [10];
-			int socket_invitador;
-			strcpy (invitador, nombre);
+			//int socket_invitador;
 			p = strtok( NULL, "/");
 			strcpy (decision, p);
 			
 			if (strcmp(decision, "SI")==0)
 			{
-				printf("invitador: %s \n",invitador);
+				pthread_mutex_lock( &mutex);
 				socket_invitador = DameSocket(&miLista,invitador);  //buscamos el socket de la persona que nos ha invitado
 				sprintf (respuesta,"7/%d",1);
+				pthread_mutex_unlock( &mutex);
 			}
 			if (strcmp(decision, "NO")==0)
 			{
 				printf("invitador: %s \n",invitador);
+				pthread_mutex_lock( &mutex);
 				socket_invitador = DameSocket(&miLista,invitador);  //buscamos el socket de la persona que nos ha invitado
 				sprintf (respuesta,"7/%d",0);
+				pthread_mutex_unlock( &mutex);
 			}
-			
 			write (socket_invitador,respuesta, strlen(respuesta));  //respondemos solo a quien nos ha invitado
 			printf("%s\n",respuesta);
 			strcpy(respuesta,"");
 		}
 		
-		if ((codigo !=0) && (codigo!=6) && (codigo!= 7))
+		else if (codigo == 8) //chat
+		{
+			char mensaje[200];
+			strcpy(mensaje, p);
+			sprintf(respuesta,"8/%s: %s",us,mensaje);
+			pthread_mutex_lock( &mutex);
+			for (i=0; i<miLista.num; i++){  //enviamos este mensaje a todos los clientes
+				write (miLista.conectados[i].socket,respuesta, strlen(respuesta)); 
+			}
+			pthread_mutex_unlock( &mutex);
+			strcpy(respuesta,"");
+		}	
+		
+		else if (codigo == 9)  //Codigo para pasar los movimientos de las fichas
+		{
+			char pb [10] ;
+			int posx;
+			int posy;
+			char turno[20];
+			strcpy(pb,nombre);
+			p=strtok(NULL,"/");
+			posx=atoi(p);
+			p=strtok(NULL,"/");
+			posy=atoi(p);
+			p=strtok(NULL,"/");
+			strcpy(turno,p);
+			sprintf(respuesta, "10/%s/%d/%d",pb,posx,posy);
+			
+			if (strcmp(turno,invitador)==0)
+				write (socket_invitado,respuesta, strlen(respuesta));
+			else
+				write (socket_invitador,respuesta, strlen(respuesta));
+			strcpy(respuesta,"");
+		}
+		
+		else if (codigo==10)  //Marca el inicio de partida
+		{
+			char jugador_inicio[20];
+			char color_inicio[20];
+			strcpy(jugador_inicio,nombre);
+			p=strtok(NULL,"/");
+			strcpy(color_inicio,p);
+			sprintf(respuesta,"12/%s/%s",jugador_inicio, color_inicio);
+			printf("%s \n", respuesta);
+			write (socket_invitado,respuesta, strlen(respuesta));
+			strcpy(respuesta,"");
+		}
+		
+		else if(codigo==11)  //Codigo para pasar el turno entre jugadores
+		{
+			char turno_color[20];
+			strcpy(turno_color,nombre);
+			char jugador_turno[20];
+			char jugador_actual[20];
+			p=strtok(NULL,"/");
+			strcpy(jugador_turno,p);
+			strcpy(respuesta,"");
+			pthread_mutex_lock( &mutex);
+			if (strcmp(jugador_turno,invitador)==0)
+			{
+				strcpy(jugador_actual,invitado);
+				sprintf(respuesta,"13/%s/%s",turno_color,jugador_actual);
+				write (socket_invitado,respuesta, strlen(respuesta));
+				if (strcmp(jugador_actual,invitado)==0)
+				{
+					char respuesta2[500];
+					sprintf(respuesta2,"14/%s",jugador_actual);
+					write (socket_invitador,respuesta2, strlen(respuesta2));
+				}
+			}
+			else
+			{
+				strcpy(jugador_actual,invitador);
+				sprintf(respuesta,"13/%s/%s",turno_color,jugador_actual);
+				write (socket_invitador,respuesta, strlen(respuesta));
+				if (strcmp(jugador_actual,invitador)==0)
+				{
+					char respuesta2[500];
+					sprintf(respuesta2,"14/%s",jugador_actual);
+					write (socket_invitado,respuesta2, strlen(respuesta2));
+				}
+			}
+			strcpy(respuesta,"");
+			pthread_mutex_unlock( &mutex);
+		}
+		
+		else if (codigo==12)
+		{
+			char usu_eliminado[20];
+			char psw_eliminado [20];
+			
+			strcpy(usu_eliminado,nombre);
+			p=strtok(NULL,"/");
+			strcpy(psw_eliminado,p);
+			pthread_mutex_lock( &mutex);
+			Eliminar_datos(&miLista,usu_eliminado,psw_eliminado,sock_conn,respuesta);
+			pthread_mutex_unlock( &mutex);
+			char comprobacion[20];
+			strcpy(comprobacion,"15/");
+			strcat(comprobacion,usu_eliminado);
+			if (strcmp(comprobacion,respuesta)==0)
+			{
+				terminar=1;
+				pthread_mutex_lock( &mutex);
+				EliminaUsuario(&miLista,nombre);
+				char conectados [512];
+				DameConectados(&miLista, conectados);
+				sprintf(notificacion,"5/%s ",conectados);			
+				for(int j =0; j<miLista.num;j++)
+				{
+					write(miLista.conectados[i].socket,notificacion,strlen(notificacion));
+					printf("%s\n",notificacion);
+				}
+				strcpy(notificacion,"");
+				pthread_mutex_unlock( &mutex);
+			}
+		}
+		
+		else if (codigo==13)  //Codigo para determinar que fichas han terminado
+		{
+			char color[20];
+			char jugador[20];
+			int fichas_terminadas;
+			strcpy(color,nombre);
+			p=strtok(NULL,"/");
+			strcpy(jugador,p);
+			p=strtok(NULL,"/");
+			fichas_terminadas=atoi(p);
+			sprintf(respuesta,"16/%s/%d",color,fichas_terminadas);
+			printf("%s\n",respuesta);
+			if (strcmp(jugador,invitador)==0)
+				write (socket_invitador,respuesta, strlen(respuesta));
+			else
+				write (socket_invitado,respuesta, strlen(respuesta));
+			strcpy(respuesta,"");
+			
+		}
+		
+		if ((codigo !=0) && (codigo!=6) && (codigo!= 7) && (codigo!= 8) && (codigo!=10) && (codigo!=11) &&(codigo!=13))
 		{
 			
 			printf ("Respuesta: %s\n", respuesta);
 			// Enviamos respuesta
 			write (sock_conn,respuesta, strlen(respuesta));
 		}
-		if ((codigo ==1)||(codigo ==2)||(codigo ==3)||(codigo ==4)) //Mientras se están procesando todas las acciones
+		if ((codigo==0)||(codigo ==1)||(codigo ==2)||(codigo ==3)||(codigo ==4) ||(codigo ==5) || (codigo==12)) //Mientras se están procesando todas las acciones
 		{
 			
 			pthread_mutex_lock( &mutex);
@@ -516,7 +902,6 @@ void *AtenderCliente (void *socket)
 			for(int j =0; j<miLista.num;j++)
 			{
 				write(miLista.conectados[j].socket,notificacion,strlen(notificacion));
-				printf("%s\n",notificacion);
 			}
 			strcpy(notificacion,"");
 			pthread_mutex_unlock( &mutex); //ya puedes interrumpirme
@@ -534,8 +919,8 @@ int main(int argc, char *argv[])
 	miLista.num=0;
 	int sock_conn, sock_listen, ret;
 	struct sockaddr_in serv_adr;
-	//int puerto = 50079;
-	int puerto = 9050;
+	int puerto = 50079;
+	//int puerto = 9010;
 	
 	
 	// INICIALITZACIONS
